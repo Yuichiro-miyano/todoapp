@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ToDoリスト</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: 'Noto Sans JP', sans-serif; }
+  .todo-item:hover .delete-btn { opacity: 1; }
+</style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-start justify-center pt-16 pb-16 px-4">
+<div class="w-full max-w-lg" id="app">
+
+  <!-- ヘッダー -->
+  <div class="mb-8 text-center">
+    <h1 class="text-3xl font-semibold text-slate-800 tracking-tight">ToDoリスト</h1>
+    <p class="mt-1 text-sm text-slate-400" id="subtitle">タスクを追加してはじめましょう</p>
+  </div>
+
+  <!-- 入力フォーム -->
+  <div class="flex gap-2 mb-6">
+    <input id="input" type="text" placeholder="新しいタスクを入力..."
+      class="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 placeholder-slate-300 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-transparent transition"
+      onkeydown="if(event.key==='Enter') addTodo()">
+    <button onclick="addTodo()"
+      class="px-5 py-3 rounded-xl bg-slate-800 text-white text-sm font-medium shadow-sm hover:bg-slate-700 active:bg-slate-900 transition">
+      追加
+    </button>
+  </div>
+
+  <!-- フィルタータブ -->
+  <div id="filter-bar" class="hidden flex gap-1 mb-4 p-1 bg-white rounded-xl border border-slate-200 shadow-sm">
+    <button onclick="setFilter('all')" id="tab-all" class="flex-1 py-2 rounded-lg text-xs font-medium bg-slate-800 text-white shadow-sm transition">すべて</button>
+    <button onclick="setFilter('active')" id="tab-active" class="flex-1 py-2 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-700 transition">未完了</button>
+    <button onclick="setFilter('done')" id="tab-done" class="flex-1 py-2 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-700 transition">完了</button>
+  </div>
+
+  <!-- タスクリスト -->
+  <div id="todo-list" class="space-y-2"></div>
+
+  <!-- 完了一括削除 -->
+  <div id="clear-btn" class="hidden mt-4 text-center">
+    <button onclick="clearDone()" class="text-xs text-slate-400 hover:text-red-400 transition-colors" id="clear-text"></button>
+  </div>
+</div>
+
+<script>
+  let todos = [];
+  try { todos = JSON.parse(localStorage.getItem('todos') || '[]'); } catch(e) {}
+  let filter = 'all';
+
+  function save() { try { localStorage.setItem('todos', JSON.stringify(todos)); } catch(e) {} }
+
+  function addTodo() {
+    const input = document.getElementById('input');
+    const text = input.value.trim();
+    if (!text) return;
+    todos.unshift({ id: Date.now().toString(), text, completed: false });
+    input.value = '';
+    save(); render();
+    input.focus();
+  }
+
+  function toggleTodo(id) {
+    todos = todos.map(t => t.id === id ? {...t, completed: !t.completed} : t);
+    save(); render();
+  }
+
+  function deleteTodo(id) {
+    todos = todos.filter(t => t.id !== id);
+    save(); render();
+  }
+
+  function clearDone() {
+    todos = todos.filter(t => !t.completed);
+    save(); render();
+  }
+
+  function setFilter(f) {
+    filter = f;
+    ['all','active','done'].forEach(k => {
+      const btn = document.getElementById('tab-' + k);
+      if (k === f) { btn.className = 'flex-1 py-2 rounded-lg text-xs font-medium bg-slate-800 text-white shadow-sm transition'; }
+      else { btn.className = 'flex-1 py-2 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-700 transition'; }
+    });
+    render();
+  }
+
+  function render() {
+    const active = todos.filter(t => !t.completed).length;
+    const done = todos.filter(t => t.completed).length;
+
+    // subtitle
+    const sub = document.getElementById('subtitle');
+    if (todos.length === 0) sub.textContent = 'タスクを追加してはじめましょう';
+    else if (active === 0) sub.textContent = 'すべてのタスクが完了しています！';
+    else sub.textContent = `${active}件の未完了タスクがあります`;
+
+    // filter bar
+    const filterBar = document.getElementById('filter-bar');
+    filterBar.className = todos.length > 0
+      ? 'flex gap-1 mb-4 p-1 bg-white rounded-xl border border-slate-200 shadow-sm'
+      : 'hidden flex gap-1 mb-4 p-1 bg-white rounded-xl border border-slate-200 shadow-sm';
+    document.getElementById('tab-all').textContent = `すべて (${todos.length})`;
+    document.getElementById('tab-active').textContent = `未完了 (${active})`;
+    document.getElementById('tab-done').textContent = `完了 (${done})`;
+
+    // list
+    const filtered = todos.filter(t => {
+      if (filter === 'active') return !t.completed;
+      if (filter === 'done') return t.completed;
+      return true;
+    });
+
+    const list = document.getElementById('todo-list');
+    if (filtered.length === 0) {
+      const msg = filter === 'done' ? '完了したタスクはありません' : filter === 'active' ? '未完了のタスクはありません' : 'タスクがありません';
+      list.innerHTML = `<div class="text-center py-12 text-slate-300 text-sm">${msg}</div>`;
+    } else {
+      list.innerHTML = filtered.map(t => `
+        <div class="todo-item group flex items-center gap-3 px-4 py-3.5 rounded-xl bg-white border shadow-sm transition-all ${t.completed ? 'border-slate-100 opacity-60' : 'border-slate-200 hover:border-slate-300'}">
+          <button onclick="toggleTodo('${t.id}')"
+            class="flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${t.completed ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 hover:border-slate-400'}">
+            ${t.completed ? '<svg class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>' : ''}
+          </button>
+          <span class="flex-1 text-sm leading-relaxed ${t.completed ? 'line-through text-slate-400' : 'text-slate-700'}">${t.text}</span>
+          <button onclick="deleteTodo('${t.id}')" class="delete-btn flex-shrink-0 opacity-0 w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-400 hover:bg-red-50 transition-all">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>`).join('');
+    }
+
+    // clear btn
+    const clearDiv = document.getElementById('clear-btn');
+    clearDiv.className = done > 0 ? 'mt-4 text-center' : 'hidden mt-4 text-center';
+    document.getElementById('clear-text').textContent = `完了済みを削除 (${done}件)`;
+  }
+
+  render();
+</script>
+</body>
+</html>
